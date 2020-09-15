@@ -42,11 +42,26 @@ Model warnings from symptoms.  Here age comes into play
 Model spread between classrooms other than family spread
 Model immunity in the community.  
 Perhaps 6,000 people already immune in the town?
+Keeping siblings home
+Family transmission below 100%
 
 Exceptions instead of 'Error'
 
 Assert
 everyone belongs to family unit
+
+nytimes: 
+https://www.nytimes.com/interactive/2020/09/14/opinion/politics/coronavirus-close-borders-travel-quarantine.html
+A better checkpoint precaution is a P.C.R. test,
+which will catch around 70 percent of cases...
+ 
+A person will usually test negative just after being infected. 
+As the illness progresses over the next few days, 
+symptoms may appear and the test is more likely 
+to turn out positive. The peak of contagiousness is
+around the fifth day, and the test is most 
+sensitive around the eighth day, catching 
+around 80 percent of cases...
 
 """
 import math
@@ -63,6 +78,7 @@ last_contagious_day = 13
 
 first_positive_test_day = 1
 last_positive_test_day = 16
+sensitivity = 0.7 # chance test correctly catches sickness
 
 students_per_family = 1.25
 
@@ -73,6 +89,8 @@ S1_classes_in_school = 10
 S2_class_size = 10
 S2_teachers = 2
 S2_classes_in_school = 3
+
+class_spread_rate = .3 # daily chance of spread between 2 students
 
 N_sim = 1000
 N_days = 90
@@ -166,7 +184,29 @@ class classroom:
             stdt.sicken(day)
         for teach in self.teachers:
             teach.sicken(day)
-            
+
+    def class_spread(self, day):
+        # sicken others in class probabilistically
+        # class_spread_rate is chance a single contagious
+        # student or teacher will transmit to a single
+        # other student or teacher who is currently healthy
+
+        num_contagious = self.num_contagious_students_in_classroom()
+        for teach in self.teachers:
+            if teach.is_contagious():
+                num_contagious += 1
+
+        # say 2 contagious people, and 40% class spread rate
+        # prob not transmitting is (1-0.4)^2 = 0.36
+        # so prob transmitting is 1 - (1-0.4)^2 = 0.64
+        prob_transmission = 1-(1-class_spread_rate)**num_contagious
+        for stdt in self.students:
+            if random.uniform(0, 1) < prob_transmission:
+                stdt.sicken(day)
+        for teach in self.teachers:
+            if random.uniform(0, 1) < prob_transmission:
+                teach.sicken(day)
+
     def update_days_sick(self):
         for stdt in self.students:
             stdt.update_days_sick()
@@ -176,6 +216,25 @@ class classroom:
     def test(self, day):
         for stdt in self.students:
             if stdt.tests_positive():
+                if self.earliest_positive_test_day is None:
+                    self.earliest_positive_test_day = day
+        for teach in self.teachers:
+            if teach.tests_positive():
+                if self.earliest_positive_test_day is None:
+                    self.earliest_positive_test_day = day
+
+    def test_imperfect(self, day):
+        # Assumes test does not catch cases every time
+        could_be_positive = False
+        for stdt in self.students:
+            if stdt.tests_positive():
+                could_be_positive = True
+        for teach in self.teachers:
+            if teach.tests_positive():
+                could_be_positive = True
+
+        if could_be_positive:
+           if random.uniform(0, 1) < sensitivity:
                 if self.earliest_positive_test_day is None:
                     self.earliest_positive_test_day = day
                 
@@ -206,7 +265,8 @@ class school:
         
     def test(self, day):
         for clrm in self.classrooms:
-            clrm.test(day)
+            #clrm.test(day)
+            clrm.test_imperfect(day)
                     
     def actual_students_per_family(self):
         family_set = set()
@@ -245,8 +305,8 @@ class school:
             for clrm in self.classrooms:
                 if (not clrm.offline(day)):
                     if clrm.any_contagious_cases_in_classroom():
-                        clrm.sicken_all(day)
-                    
+                        #clrm.sicken_all(day)
+                        clrm.class_spread(day)
         # TODO - spread between classrooms (e.g., bathrooms, busses)
         
         #within families
