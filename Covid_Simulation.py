@@ -16,8 +16,6 @@ before a direct contact (e.g., grandparent) is infected?
 before a 2nd degree contact (e.g., cousin) is infected? 
 
 ASSUMPTIONS 
-* complete and certain spread within classrooms
-once anyone is contagious
 * complete and certain spread within families
 once anyone is contagious
 * for other assumptions, see the settings 
