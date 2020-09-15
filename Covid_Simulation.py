@@ -25,15 +25,15 @@ of the constants below
 
 
 PRELIMINARY RESULTS
-73% chance that at least one kid is infected in 90 days
-57%  chance that at least one kid is 
+54% chance that at least one kid is infected in 90 days
+31%  chance that at least one kid is 
 infected and there is sufficient warning for the direct contact
-2%  chance that at least one kid is infected and
+5%  chance that at least one kid is infected and
 there is only sufficient warning for the second-degree contact
-14%  chance that at least one kid is infected and
+17%  chance that at least one kid is infected and
 there is no warning even for the second-degree contact
 
-Almost all the danger of infection without warning is
+Most of the danger of infection without warning is
 from the school that does not test
 
 
