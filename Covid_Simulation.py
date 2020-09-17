@@ -18,17 +18,18 @@ before a 2nd degree contact (e.g., cousin) is infected?
 ASSUMPTIONS 
 * complete and certain spread within families
 once anyone is contagious
+* some pre-existing immunity in the community
 * for other assumptions, see the settings 
 of the constants below
 
 
 PRELIMINARY RESULTS
-54% chance that at least one kid is infected in 90 days
-31%  chance that at least one kid is 
+49% chance that at least one kid is infected in 90 days
+25%  chance that at least one kid is 
 infected and there is sufficient warning for the direct contact
 5%  chance that at least one kid is infected and
 there is only sufficient warning for the second-degree contact
-17%  chance that at least one kid is infected and
+18%  chance that at least one kid is infected and
 there is no warning even for the second-degree contact
 
 Most of the danger of infection without warning is
@@ -48,6 +49,7 @@ Exceptions instead of 'Error'
 Assert
 everyone belongs to family unit
 
+BACKGROUND
 nytimes: 
 https://www.nytimes.com/interactive/2020/09/14/opinion/politics/coronavirus-close-borders-travel-quarantine.html
 A better checkpoint precaution is a P.C.R. test,
@@ -66,9 +68,11 @@ import math
 import random
 
 population = 30054 # for local town of schools
-cases_in_aug = 7 # town-wide cases
+historic_cases = 536 # gives idea on population immunity
+cases_last_month = 12 # town-wide cases (7 through 8/21, then another 5)
 undetected_per_detected = 10 # https://jamanetwork.com/journals/jamainternalmedicine/fullarticle/2768834
-actual_cases_in_aug = cases_in_aug*(undetected_per_detected+1)
+actual_cases_last_month = cases_last_month*(undetected_per_detected+1)
+actual_historic_cases = historic_cases*(undetected_per_detected+1)
 
 test_lag = 1 # days to get test results
 first_contagious_day = 3
@@ -99,8 +103,12 @@ class person:
         self.age = age
         self.days_with_virus = -1
         self.day_infected = 1000000
-        self.family_unit = None 
+        self.family_unit = None
+        self.preexisting_immunity = False
         #self.would_show_symptoms = would_show_symptoms
+        
+    def give_preexisting_immunity(self):
+        self.preexisting_immunity = True
         
     def assign_to_family(self, fam):
         self.family_unit = fam
@@ -130,7 +138,8 @@ class person:
             return False
             
     def sicken(self, day):
-        if self.days_with_virus == -1:
+        if (self.days_with_virus == -1) and\
+            (not self.preexisting_immunity):
             self.days_with_virus = 0
             self.day_infected = day
             
@@ -370,6 +379,33 @@ class school:
                 any_cases = clrm.any_contagious_cases_in_classroom()
         return any_cases
 
+    def preexisting_immunity_to_xth_person(self, x, exclude_list):
+        # gives xth person preexisting immunity
+        # if not in exclude_list
+        p = -1
+        for clrm in self.classrooms:
+            for stdt in clrm.students:
+                p += 1
+                if p == x:
+                    if stdt.name in exclude_list:
+                        return
+                    else: 
+                        stdt.give_preexisting_immunity()
+                        return
+
+            for teach in clrm.teachers:
+                p += 1
+                if p == x:
+                    if teach.name in exclude_list:
+                        return
+                    else: 
+                        teach.give_preexisting_immunity()
+                        return
+
+
+        print ("Error - there are not {} applicable people in school".format(x))
+
+
     def sicken_xth_person(self, x, exclude_list, day):
         # makes xth person sick and returns True if 
         # not excluded and not already sick
@@ -412,7 +448,7 @@ def resident_cases(residents):
 
 
 # In what pct of simulations does S1 or S2 get virus?
-new_cases_per_day = actual_cases_in_aug/30
+new_cases_per_day = actual_cases_last_month/30
 fraction_part = new_cases_per_day % 1
 
 S1_infections = 0
@@ -468,6 +504,25 @@ for sim in range(N_sim):
                        -S1_school.total_people()
                        -S2_school.total_people())] 
 
+    # assign pre-existing immunity, 
+    # but exclude our two siblings of interest
+
+    pop = list(range(population)) 
+     
+    immune_list = random.sample(pop, actual_historic_cases) 
+    for i in immune_list:
+        if i < len(other_residents):
+            other_residents[i].give_preexisting_immunity()
+        elif i < len(other_residents) + S1_school.total_people(): 
+            S1_school.preexisting_immunity_to_xth_person(
+                i-len(other_residents), ["student_1_1"])
+        else: 
+            S2_school.preexisting_immunity_to_xth_person(
+                i-len(other_residents)-S1_school.total_people(),
+                ["student_1_1"])
+
+    non_immune_list = list(set(pop) - set(immune_list))
+    
     # assign students to families
     S1_school.assign_to_random_families()
     S2_school.assign_to_random_families()
@@ -496,20 +551,19 @@ for sim in range(N_sim):
         
         if today_cases > 0:
             #print ("Cases today: {}".format(today_cases))
-            pop = list(range(population)) 
-     
-            new_list = random.sample(pop, today_cases) 
-            for i in new_list:
+
+            new_cases_list = random.sample(non_immune_list, today_cases) 
+            for i in new_cases_list:
                 if i < len(other_residents):
                     other_residents[i].sicken(day)
                 elif i < len(other_residents) + S1_school.total_people(): 
                     already_sick = not S1_school.sicken_xth_person(
-                            i-len(other_residents), "student_1_1", day)
+                            i-len(other_residents), ["student_1_1"], day)
 
                 else: 
                     already_sick = not S2_school.sicken_xth_person(
                             i-len(other_residents)-S1_school.total_people(),
-                            "student_1_1", day)
+                            ["student_1_1"], day)
     
         
         #spread virus from existing cases in schools
